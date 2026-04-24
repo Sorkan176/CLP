@@ -23,11 +23,11 @@ void main_program(const std::string& file_name)
 //    auto result = exact_algorithm(data);
 //    save_solution_csv(result.best_placements, "exact_solution.csv");
     auto result = grasp(data);
-    save_solution_csv(result.best_placements, "solution_75.csv");
+    save_solution_csv(result.best_placements, "solution_98.csv");
 }
 
 int main()
 {
-    main_program("../data/tests/test_75.txt");
+    main_program("../data/tests/test_98.txt");
     return 0;
 }

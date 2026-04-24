@@ -182,15 +182,6 @@ std::vector<Placement> check_dynamic_stability(
 
     for (const auto& pl : sorted_boxes)
     {
-        double h = pl.z + pl.d / 2.0;
-        double b = pl.l / 2.0;
-
-        if (max_accel * h > g * b)
-        {
-            unstable.push_back(pl);
-            continue;
-        }
-
         if (!is_tilt_stable(pl, sorted_boxes, container.w, container.l))
         {
             unstable.push_back(pl);
@@ -214,6 +205,15 @@ std::vector<Placement> construct_packing(
     for (auto& [dest, group] : groups)
     {
         auto remaining = group;
+        std::vector<Space> temp_unused_spaces;
+        if (!temp_unused_spaces.empty()) {
+            free_spaces.insert(
+                    free_spaces.end(),
+                    std::make_move_iterator(temp_unused_spaces.begin()),
+                    std::make_move_iterator(temp_unused_spaces.end())
+            );
+            temp_unused_spaces.clear();
+        }
 
         while (!free_spaces.empty() && !remaining.empty())
         {
@@ -224,6 +224,7 @@ std::vector<Placement> construct_packing(
 
             if (candidates.empty())
             {
+                temp_unused_spaces.push_back(space);
                 free_spaces.erase(
                         std::remove(free_spaces.begin(),
                                     free_spaces.end(),
@@ -326,6 +327,15 @@ std::vector<Placement> improvement_phase(
     for (auto& [dest, group] : groups)
     {
         auto items = group;
+        std::vector<Space> temp_unused_spaces;
+        if (!temp_unused_spaces.empty()) {
+            free_spaces.insert(
+                    free_spaces.end(),
+                    std::make_move_iterator(temp_unused_spaces.begin()),
+                    std::make_move_iterator(temp_unused_spaces.end())
+            );
+            temp_unused_spaces.clear();
+        }
 
         while (!free_spaces.empty() && !items.empty())
         {
@@ -336,6 +346,7 @@ std::vector<Placement> improvement_phase(
 
             if (candidates.empty())
             {
+                temp_unused_spaces.push_back(space);
                 free_spaces.erase(
                         std::remove(free_spaces.begin(),
                                     free_spaces.end(),
@@ -436,7 +447,7 @@ SolverState grasp(const std::vector<std::vector<int>>& data)
 
     auto start = std::chrono::high_resolution_clock::now();
 
-    auto state = hybrid_container_loading(items, container, 3000);
+    auto state = hybrid_container_loading(items, container, 2000);
 
     auto end = std::chrono::high_resolution_clock::now();
     std::chrono::duration<double> elapsed = end - start;

@@ -75,20 +75,12 @@ bool is_dynamically_stable(
         double max_accel,
         double mu)
 {
-    const double g = 9.81;
-
     // sliding
     if (max_accel >= mu * g)
         return false;
 
     for (const auto& pl : placed)
     {
-        double h = pl.z + pl.d / 2.0;
-        double b = pl.l / 2.0;
-
-        if (max_accel * h > g * b)
-            return false;
-
         if (!is_tilt_stable(pl, placed, container_wd, container_lth))
             return false;
     }
@@ -187,7 +179,8 @@ bool is_tilt_stable(
         const std::vector<Placement>& placed,
         int container_wd,
         int container_lth,
-        double tipping_angle_deg)
+        double max_accel,
+        double tipping_angle_rad)
 {
     auto unconstrained =
             check_constrained_sides(pl, placed, container_wd, container_lth);
@@ -205,9 +198,6 @@ bool is_tilt_stable(
 
     double h = pl.d/2.0;
 
-    double tipping_angle =
-            tipping_angle_deg * M_PI / 180.0;
-
     for (const auto& side : unconstrained)
     {
         double w = 0;
@@ -220,10 +210,13 @@ bool is_tilt_stable(
         if (w <= 0)
             return false;
 
-        double critical_angle = std::atan(w/h);
-
-        if (critical_angle < tipping_angle)
+        if (max_accel * h > g * w) {
             return false;
+        }
+
+        if (w <= tipping_angle_rad*h) {
+            return false;
+        }
     }
 
     return true;

@@ -42,7 +42,7 @@ std::vector<Placement> improvement_phase(
         const std::vector<Placement>& placements,
         const std::vector<Placement>& unstable,
         const Space& container,
-        double remove_ratio = 0.18);
+        double remove_ratio = 0.17);
 
 SolverState grasp(const std::vector<std::vector<int>>& data);
 
