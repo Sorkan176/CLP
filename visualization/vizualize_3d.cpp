@@ -11,7 +11,7 @@ void save_solution_csv(
 
     for (const auto& p : placements)
     {
-        file << p.item.id << ","
+        file << p.item_index << ","
              << p.x << ","
              << p.y << ","
              << p.z << ","

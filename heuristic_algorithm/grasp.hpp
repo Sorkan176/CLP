@@ -3,7 +3,16 @@
 #include <map>
 #include "../structure/data_structure.hpp"
 
-std::vector<std::pair<Placement,double>> generate_feasible_placements(
+
+struct Candidate {
+    Placement placement;
+    double support;
+
+    Candidate(const Placement& p, double s)
+            : placement(p), support(s) {}
+};
+
+std::vector<Candidate> generate_feasible_placements(
         const Space& space,
         const std::vector<Item>& items,
         const std::vector<Placement>& placed,
@@ -17,16 +26,16 @@ double placement_score(
         double gamma = 0.05);
 
 std::vector<Placement> build_rcl(
-        const std::vector<std::pair<Placement,double>>& candidates,
+        const std::vector<Candidate>& candidates,
         double alpha);
 
-Placement select_block_randomly(const std::vector<Placement>& rcl);
+const Placement& select_block_randomly(const std::vector<Placement>& rcl);
 
 std::map<int, std::vector<Item>> group_items_by_destination(
         const std::vector<Item>& items);
 
 Placement choose_best_candidate(
-        const std::vector<std::pair<Placement,double>>& candidates);
+        const std::vector<Candidate>& candidates);
 
 std::vector<Placement> check_dynamic_stability(
         const std::vector<Placement>& placements,
@@ -39,10 +48,11 @@ std::vector<Placement> construct_packing(
         const Space& container);
 
 std::vector<Placement> improvement_phase(
+        const std::vector<Item>& items,
         const std::vector<Placement>& placements,
         const std::vector<Placement>& unstable,
         const Space& container,
-        double remove_ratio = 0.17);
+        double remove_ratio = 0.15);
 
 SolverState grasp(const std::vector<std::vector<int>>& data);
 

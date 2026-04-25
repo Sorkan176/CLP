@@ -197,6 +197,7 @@ bool is_tilt_stable(
     double cy = pl.y + pl.l/2.0;
 
     double h = pl.d/2.0;
+    constexpr double EPS = 1e-9;
 
     for (const auto& side : unconstrained)
     {
@@ -210,11 +211,11 @@ bool is_tilt_stable(
         if (w <= 0)
             return false;
 
-        if (max_accel * h > g * w) {
+        if (max_accel * h > g * w + EPS) {
             return false;
         }
 
-        if (w <= tipping_angle_rad*h) {
+        if (w <= tipping_angle_rad * h + EPS) {
             return false;
         }
     }

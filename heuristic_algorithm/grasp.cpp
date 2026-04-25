@@ -7,43 +7,43 @@
 #include "../stability/static_stability.hpp"
 #include "../stability/dynamic_stability.hpp"
 
-std::vector<std::pair<Placement,double>> generate_feasible_placements(
+std::vector<Candidate> generate_feasible_placements(
         const Space& space,
         const std::vector<Item>& items,
         const std::vector<Placement>& placed,
         double min_support)
 {
-    std::vector<std::pair<Placement,double>> candidates;
+    std::vector<Candidate> candidates;
+    candidates.reserve(items.size());
 
-    for (const auto& it : items)
+    for (const Item& it : items)
     {
-        int dims_arr[3] = {it.w, it.l, it.d};
+        const int dims_arr[3] = {it.w, it.l, it.d};
 
-        for (const auto& orient : ORIENTATIONS)
+        int orient_limit = it.turning ? 6 : 2;
+
+        for (int oi = 0; oi < orient_limit; oi++)
         {
-            Orientation dims{
-                    dims_arr[orient.x],
-                    dims_arr[orient.y],
-                    dims_arr[orient.z]
-            };
+            const auto& orient = ORIENTATIONS[oi];
+            int dx = dims_arr[orient.x];
+            int dy = dims_arr[orient.y];
+            int dz = dims_arr[orient.z];
 
-            if (!fits_in_space(space, dims))
+            if (!fits_in_space(space, dx, dy, dz))
                 continue;
 
             Placement pl{
-                    it,
+                    it.id,
                     space.x,
                     space.y,
                     space.z,
-                    dims.x,
-                    dims.y,
-                    dims.z
+                    dx, dy, dz
             };
 
             if (placement_overlaps_existing(pl, placed))
                 continue;
 
-            double base_area = dims.x * dims.y;
+            double base_area = dx * dy;
             double sup = support_area(pl, placed);
 
             if (sup < min_support * base_area)
@@ -74,47 +74,44 @@ double placement_score(
 }
 
 std::vector<Placement> build_rcl(
-        const std::vector<std::pair<Placement,double>>& candidates,
+        const std::vector<Candidate>& candidates,
         double alpha)
 {
     if (candidates.empty())
         return {};
 
-    std::vector<std::pair<Placement,double>> scored;
+    double f_max = -1e18;
+    double f_min =  1e18;
 
-    for (auto& c : candidates)
+    // первый проход: границы
+    for (const auto& c : candidates)
     {
-        double sc = placement_score(c.first, c.second);
-        scored.emplace_back(c.first, sc);
-    }
-
-    double f_max = scored.front().second;
-    double f_min = scored.front().second;
-
-    for (auto& s : scored)
-    {
-        f_max = std::max(f_max, s.second);
-        f_min = std::min(f_min, s.second);
+        double sc = placement_score(c.placement, c.support);
+        f_max = std::max(f_max, sc);
+        f_min = std::min(f_min, sc);
     }
 
     double threshold = f_max - alpha * (f_max - f_min);
 
     std::vector<Placement> rcl;
+    rcl.reserve(candidates.size());
 
-    for (auto& s : scored)
-        if (s.second >= threshold)
-            rcl.push_back(s.first);
+    // второй проход: отбор
+    for (const auto& c : candidates)
+    {
+        double sc = placement_score(c.placement, c.support);
+        if (sc >= threshold)
+            rcl.push_back(c.placement);
+    }
 
     return rcl;
 }
 
-Placement select_block_randomly(const std::vector<Placement>& rcl)
+const Placement& select_block_randomly(const std::vector<Placement>& rcl)
 {
     static std::mt19937 rng(std::random_device{}());
-
-    std::uniform_int_distribution<int> dist(0, rcl.size()-1);
-
-    return rcl[dist(rng)];
+    size_t idx = rng() % rcl.size();
+    return rcl[idx];
 }
 
 std::map<int, std::vector<Item>> group_items_by_destination(
@@ -129,7 +126,7 @@ std::map<int, std::vector<Item>> group_items_by_destination(
 }
 
 Placement choose_best_candidate(
-        const std::vector<std::pair<Placement,double>>& candidates)
+        const std::vector<Candidate>& candidates)
 {
     Placement best{};
     double best_score = -std::numeric_limits<double>::infinity();
@@ -225,11 +222,15 @@ std::vector<Placement> construct_packing(
             if (candidates.empty())
             {
                 temp_unused_spaces.push_back(space);
-                free_spaces.erase(
-                        std::remove(free_spaces.begin(),
-                                    free_spaces.end(),
-                                    space),
-                        free_spaces.end());
+                for (size_t i = 0; i < free_spaces.size(); ++i)
+                {
+                    if (free_spaces[i] == space)
+                    {
+                        free_spaces[i] = free_spaces.back();
+                        free_spaces.pop_back();
+                        break;
+                    }
+                }
                 continue;
             }
 
@@ -242,12 +243,13 @@ std::vector<Placement> construct_packing(
 
             placed.push_back(chosen);
 
-            remaining.erase(
-                    std::remove_if(
-                            remaining.begin(),
-                            remaining.end(),
-                            [&](const Item& i){ return i.id == chosen.item.id; }),
-                    remaining.end());
+            for (size_t i = 0; i < remaining.size(); ++i) {
+                if (remaining[i].id == chosen.item_index) {
+                    remaining[i] = remaining.back();
+                    remaining.pop_back();
+                    break;
+                }
+            }
 
             free_spaces = update_free_spaces_mes(free_spaces, chosen);
         }
@@ -257,6 +259,7 @@ std::vector<Placement> construct_packing(
 }
 
 std::vector<Placement> improvement_phase(
+        const std::vector<Item>& items,
         const std::vector<Placement>& placements,
         const std::vector<Placement>& unstable,
         const Space& container,
@@ -290,7 +293,7 @@ std::vector<Placement> improvement_phase(
     {
         auto it = std::find_if(
                 to_remove.begin(), to_remove.end(),
-                [&](const Placement& p){ return p.item.id == u.item.id; });
+                [&](const Placement& p){ return p.item_index == u.item_index; });
 
         if (it == to_remove.end())
             to_remove.push_back(u);
@@ -303,7 +306,7 @@ std::vector<Placement> improvement_phase(
         bool removed = false;
 
         for (const auto& r : to_remove)
-            if (pl.item.id == r.item.id)
+            if (pl.item_index == r.item_index)
                 removed = true;
 
         if (!removed)
@@ -318,7 +321,7 @@ std::vector<Placement> improvement_phase(
     std::vector<Item> removed_items;
 
     for (const auto& pl : to_remove)
-        removed_items.push_back(pl.item);
+        removed_items.push_back(items[pl.item_index]);
 
     std::vector<Placement> placed = remaining;
 
@@ -347,11 +350,15 @@ std::vector<Placement> improvement_phase(
             if (candidates.empty())
             {
                 temp_unused_spaces.push_back(space);
-                free_spaces.erase(
-                        std::remove(free_spaces.begin(),
-                                    free_spaces.end(),
-                                    space),
-                        free_spaces.end());
+                for (size_t i = 0; i < free_spaces.size(); ++i)
+                {
+                    if (free_spaces[i] == space)
+                    {
+                        free_spaces[i] = free_spaces.back();
+                        free_spaces.pop_back();
+                        break;
+                    }
+                }
                 continue;
             }
 
@@ -359,11 +366,15 @@ std::vector<Placement> improvement_phase(
 
             placed.push_back(best);
 
-            items.erase(
-                    std::remove_if(items.begin(), items.end(),
-                                   [&](const Item& i)
-                                   { return i.id == best.item.id; }),
-                    items.end());
+            for (size_t i = 0; i < items.size(); ++i)
+            {
+                if (items[i].id == best.item_index)
+                {
+                    items[i] = items.back();
+                    items.pop_back();
+                    break;
+                }
+            }
 
             free_spaces = update_free_spaces_mes(free_spaces, best);
         }
@@ -378,7 +389,7 @@ std::vector<Placement> improvement_phase(
         bool bad = false;
 
         for (const auto& u : new_unstable)
-            if (pl.item.id == u.item.id)
+            if (pl.item_index == u.item_index)
                 bad = true;
 
         if (!bad)
@@ -391,7 +402,7 @@ std::vector<Placement> improvement_phase(
 SolverState hybrid_container_loading(
         const std::vector<Item>& items,
         const Space& container,
-        int iterations = 150)
+        int iterations = 500)
 {
     SolverState state;
 
@@ -411,6 +422,7 @@ SolverState hybrid_container_loading(
 
         placements =
                 improvement_phase(
+                        items,
                         placements,
                         unstable,
                         container
@@ -419,7 +431,7 @@ SolverState hybrid_container_loading(
         double value = 0;
 
         for (const auto& pl : placements)
-            value += pl.item.volume();
+            value += items[pl.item_index].volume;
 
         if (value > state.best_value)
         {
@@ -447,7 +459,7 @@ SolverState grasp(const std::vector<std::vector<int>>& data)
 
     auto start = std::chrono::high_resolution_clock::now();
 
-    auto state = hybrid_container_loading(items, container, 2000);
+    auto state = hybrid_container_loading(items, container, 1500);
 
     auto end = std::chrono::high_resolution_clock::now();
     std::chrono::duration<double> elapsed = end - start;
@@ -461,7 +473,7 @@ SolverState grasp(const std::vector<std::vector<int>>& data)
 
     long long total_items_volume = 0;
     for (const auto& item : items)
-        total_items_volume += item.volume();
+        total_items_volume += item.volume;
 
     long long placed_items_volume = 0;
     for (const auto& pl : state.best_placements)
