@@ -37,10 +37,12 @@ std::vector<Space> remove_contained_spaces(
 
 bool fits_in_space(
         const Space& space,
-        const Orientation& dims
-);
+        int dx,
+        int dy,
+        int dz);
 
 int calculate_total_weight(
+        const std::vector<Item>& items,
         const std::vector<Placement>& placed_items
 );
 
@@ -50,5 +52,5 @@ bool placement_overlaps_existing(
 );
 
 Space choose_anchor_space(
-        std::vector<Space> spaces
+        const std::vector<Space>& spaces
 );

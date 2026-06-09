@@ -14,11 +14,13 @@ std::pair<double, std::vector<Placement>> greedy_initial_solution(
 );
 
 bool check_destination_priority(
+        const std::vector<Item>& items,
         const Placement& current,
         const std::vector<Placement>& placed
 );
 
 void branch_and_bound(
+        const std::vector<Item>& items,
         const std::vector<Space>& free_spaces,
         const std::vector<Placement>& placed,
         const std::vector<Item>& unused_items,

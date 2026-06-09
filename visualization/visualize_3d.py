@@ -55,6 +55,6 @@ def plot_3d_boxes(df, container_size):
 
 
 if __name__ == "__main__":
-    dataframe = pd.read_csv("solution.csv")
+    dataframe = pd.read_csv("solution_75.csv")
     # dataframe = pd.read_csv("exact_solution.csv")
     plot_3d_boxes(dataframe, [587, 233, 220])

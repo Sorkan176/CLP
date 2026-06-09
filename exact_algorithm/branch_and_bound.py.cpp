@@ -17,8 +17,8 @@ double fractional_knapsack_bound(
     std::sort(items.begin(), items.end(),
               [](const Item& a, const Item& b)
               {
-                  double va = (a.value > 0) ? a.value : a.volume();
-                  double vb = (b.value > 0) ? b.value : b.volume();
+                  double va = (a.value > 0) ? a.value : a.volume;
+                  double vb = (b.value > 0) ? b.value : b.volume;
                   return va > vb;
               });
 
@@ -27,8 +27,8 @@ double fractional_knapsack_bound(
 
     for (const auto& it : items)
     {
-        double v = (it.value > 0) ? it.value : it.volume();
-        int vol = it.volume();
+        double v = (it.value > 0) ? it.value : it.volume;
+        int vol = it.volume;
 
         if (vol <= rem)
         {
@@ -50,13 +50,14 @@ double fractional_knapsack_bound(
 }
 
 bool check_destination_priority(
+        const std::vector<Item>& items,
         const Placement& current,
         const std::vector<Placement>& placed)
 {
     for (const auto& pl : placed)
     {
         if (current.z == pl.z + pl.d &&
-            current.item.destination < pl.item.destination)
+            items[current.item_index].destination < items[pl.item_index].destination)
         {
             auto [cur_min, cur_max] = coord_placement_min_max(current);
             auto [pl_min, pl_max] = coord_placement_min_max(pl);
@@ -78,97 +79,8 @@ bool check_destination_priority(
     return false;
 }
 
-std::pair<double, std::vector<Placement>>
-greedy_initial_solution(
-        const Space& container_space,
-        const std::vector<Item>& items)
-{
-    std::vector<Space> free_spaces;
-    free_spaces.push_back(container_space);
-
-    std::vector<Placement> placements;
-
-    std::vector<Item> remaining = items;
-
-    // sort by value (or volume fallback)
-    std::sort(remaining.begin(), remaining.end(),
-              [](const Item& a, const Item& b)
-              {
-                  double va = (a.value > 0) ? a.value : a.volume();
-                  double vb = (b.value > 0) ? b.value : b.volume();
-                  return va > vb;
-              });
-
-    double total_value = 0.0;
-
-    for (const auto& it : remaining)
-    {
-        bool placed_flag = false;
-
-        for (size_t s_idx = 0; s_idx < free_spaces.size(); ++s_idx)
-        {
-            Space s = free_spaces[s_idx];
-
-            for (const auto& orient : ORIENTATIONS)
-            {
-                int dims_arr[3] = {it.w, it.l, it.d};
-
-                Orientation dims{
-                        dims_arr[orient.x],
-                        dims_arr[orient.y],
-                        dims_arr[orient.z]
-                };
-
-                if (!fits_in_space(s, dims))
-                    continue;
-
-                Placement pl{
-                        it,
-                        s.x, s.y, s.z,
-                        dims.x, dims.y, dims.z
-                };
-
-                // weight constraint
-                if (calculate_total_weight(placements) > container_space.payload)
-                    continue;
-
-                // static stability
-                if (support_area(pl, placements) / (pl.w * pl.l) < 0.80)
-                    continue;
-
-                // dynamic stability
-                if (!is_dynamically_stable(placements,
-                                           container_space.w,
-                                           container_space.l))
-                    continue;
-
-                // update free spaces (MES)
-                auto new_spaces =
-                        update_free_spaces_mes(free_spaces, pl);
-
-                free_spaces = new_spaces;
-
-                placements.push_back(pl);
-
-                double v = (it.value > 0)
-                           ? it.value
-                           : it.volume();
-
-                total_value += v;
-
-                placed_flag = true;
-                break;
-            }
-
-            if (placed_flag)
-                break;
-        }
-    }
-
-    return {total_value, placements};
-}
-
 void branch_and_bound(
+        const std::vector<Item>& items,
         const std::vector<Space>& free_spaces,
         const std::vector<Placement>& placed,
         const std::vector<Item>& unused_items,
@@ -239,9 +151,9 @@ void branch_and_bound(
 
             unique.insert(dims);
 
-            if (fits_in_space(anchor, dims))
+            if (fits_in_space(anchor, dims.x, dims.y, dims.z))
             {
-                double v = (it.value > 0) ? it.value : it.volume();
+                double v = (it.value > 0) ? it.value : it.volume;
                 candidates.push_back({it,dims,v});
             }
         }
@@ -255,13 +167,13 @@ void branch_and_bound(
 
     std::sort(candidates.begin(), candidates.end(),
                       [](auto&a, auto&b){
-                          return a.item.volume() > b.item.volume();
+                          return a.item.volume > b.item.volume;
                       });
 
     for (auto& c : candidates)
     {
         Placement pl{
-                c.item,
+                c.item.id,
                 anchor.x, anchor.y, anchor.z,
                 c.dims.x, c.dims.y, c.dims.z
         };
@@ -269,10 +181,10 @@ void branch_and_bound(
 //        if (check_destination_priority(pl, placed))
 //            continue;
 
-        if (calculate_total_weight(placed) + pl.item.wt > container.payload)
+        if (calculate_total_weight(items,placed) + c.item.wt > container.payload)
             continue;
 
-        if (support_area(pl, placed) / (double)(pl.w*pl.l) < 0.80)
+        if (support_area(pl, placed) / (double)(pl.w*pl.l) < 0.70)
             continue;
 
         if (placement_overlaps_existing(pl, placed))
@@ -297,6 +209,7 @@ void branch_and_bound(
         }
 
         branch_and_bound(
+                items,
                 new_free,
                 new_placed,
                 new_unused,
@@ -313,6 +226,7 @@ void branch_and_bound(
             new_free2.push_back(s);
 
     branch_and_bound(
+            items,
             new_free2,
             placed,
             unused_items,
@@ -344,7 +258,7 @@ SolverState exact_algorithm(
 
     for (auto& it : items)
         if (it.value <= 0)
-            it.value = it.volume();
+            it.value = it.volume;
 
     // auto greedy = greedy_initial_solution(container, items);
     SolverState state = grasp(data);
@@ -360,6 +274,7 @@ SolverState exact_algorithm(
     auto start = std::chrono::high_resolution_clock::now();
 
     branch_and_bound(
+            items,
             {container},
             {},
             items,
@@ -371,10 +286,37 @@ SolverState exact_algorithm(
     auto end = std::chrono::high_resolution_clock::now();
     std::chrono::duration<double> elapsed = end - start;
 
-    std::cout << "Nodes " << state.nodes << "\n";
-    std::cout << "Best value " << std::to_string(state.best_value) << "\n";
-    std::cout << "Placement " << state.best_placements.size()<< "\n";
-    std::cout << "Time: " << elapsed.count() << " seconds\n";
+    int total_items = items.size();
+    int placed_items = state.best_placements.size();
+
+    long long total_items_volume = 0;
+    for (const auto& item : items)
+        total_items_volume += item.volume;
+
+    long long placed_items_volume = 0;
+    for (const auto& pl : state.best_placements)
+        placed_items_volume += pl.w * pl.l * pl.d;
+
+    long long container_volume = container.volume();
+
+    double item_ratio = double(placed_items) / double(total_items);
+    double volume_ratio = double(placed_items_volume) / double(container_volume);
+    double placed_volume_percent =
+            100.0 * static_cast<double>(placed_items_volume) /
+            static_cast<double>(total_items_volume);
+
+    std::cout << "B&B\n";
+    std::cout << "Total items:          " << total_items << "\n";
+    std::cout << "Placed items:         " << placed_items
+              << " (" << item_ratio * 100.0 << "%)\n";
+
+    std::cout << "\nContainer volume:     " << container_volume << "\n";
+    std::cout << "Items volume (total): " << total_items_volume << "\n";
+    std::cout << "Packed volume:        " << placed_items_volume
+              << " (" << volume_ratio * 100.0 << "% of container)"
+              << " (" << placed_volume_percent << "% of items)\n";
+
+    std::cout << "\nExecution time:       " << elapsed.count() << " seconds\n";
 
     return state;
 }

@@ -12,6 +12,7 @@ struct Item {
     int destination;
     bool turning = true;
     double value = 0.0;
+    int volume;
 
     Item() = default;
 
@@ -21,15 +22,8 @@ struct Item {
               l(row[2]),
               d(row[3]),
               wt(row[4]),
-              destination(row[5]) {}
-
-    int volume() const {
-        return w * l * d;
-    }
-
-    std::tuple<int, int, int> oriented_dims(const std::tuple<int,int,int>& orientation) const {
-        return orientation;
-    }
+              destination(row[5]),
+              volume(row[1] * row[2] * row[3]) {}
 };
 
 
@@ -66,7 +60,7 @@ struct Space {
 
 
 struct Placement {
-    Item item;
+    int item_index;
     int x;
     int y;
     int z;

@@ -139,23 +139,41 @@ std::vector<Space> remove_contained_spaces(const std::vector<Space>& spaces)
 
 std::vector<Space> update_free_spaces_mes(
         const std::vector<Space>& free_spaces,
-        const Placement& placement)
+        const Placement& pl)
 {
     std::vector<Space> new_free;
+    new_free.reserve(free_spaces.size() * 2);
+
+    const int px1 = pl.x;
+    const int py1 = pl.y;
+    const int pz1 = pl.z;
+    const int px2 = pl.x + pl.w;
+    const int py2 = pl.y + pl.l;
+    const int pz2 = pl.z + pl.d;
 
     for (const auto& s : free_spaces)
     {
-        if (!is_boxes_intersect(
-                coord_space_min_max(s),
-                coord_placement_min_max(placement)))
+        const int sx1 = s.x;
+        const int sy1 = s.y;
+        const int sz1 = s.z;
+        const int sx2 = s.x + s.w;
+        const int sy2 = s.y + s.l;
+        const int sz2 = s.z + s.d;
+
+        // no overlap
+        if (px2 <= sx1 || px1 >= sx2 ||
+            py2 <= sy1 || py1 >= sy2 ||
+            pz2 <= sz1 || pz1 >= sz2)
         {
             new_free.push_back(s);
+            continue;
         }
-        else
-        {
-            auto split = split_space_mes(s, placement);
-            new_free.insert(new_free.end(), split.begin(), split.end());
-        }
+
+        auto split = split_space_mes(s, pl);
+
+        // avoid insert
+        for (auto& sp : split)
+            new_free.push_back(sp);
     }
 
     return remove_contained_spaces(new_free);
@@ -163,19 +181,21 @@ std::vector<Space> update_free_spaces_mes(
 
 bool fits_in_space(
         const Space& space,
-        const Orientation& dims)
+        int dx,
+        int dy,
+        int dz)
 {
-    return dims.x <= space.w &&
-           dims.y <= space.l &&
-           dims.z <= space.d;
+    return dx <= space.w &&
+           dy <= space.l &&
+           dz <= space.d;
 }
 
-int calculate_total_weight(const std::vector<Placement>& placed_items)
+int calculate_total_weight(const std::vector<Item>& items, const std::vector<Placement>& placed_items)
 {
     int total = 0;
 
     for (const auto& pl : placed_items)
-        total += pl.item.wt;
+        total += items[pl.item_index].wt;
 
     return total;
 }
@@ -184,27 +204,43 @@ bool placement_overlaps_existing(
         const Placement& pl,
         const std::vector<Placement>& placed_list)
 {
-    auto pl_minmax = coord_placement_min_max(pl);
+    const int ax1 = pl.x;
+    const int ay1 = pl.y;
+    const int az1 = pl.z;
+    const int ax2 = pl.x + pl.w;
+    const int ay2 = pl.y + pl.l;
+    const int az2 = pl.z + pl.d;
 
     for (const auto& p : placed_list)
     {
-        if (is_boxes_intersect(pl_minmax,
-                               coord_placement_min_max(p)))
+        const int bx1 = p.x;
+        const int by1 = p.y;
+        const int bz1 = p.z;
+        const int bx2 = p.x + p.w;
+        const int by2 = p.y + p.l;
+        const int bz2 = p.z + p.d;
+
+        if (!(ax2 <= bx1 || ax1 >= bx2 ||
+              ay2 <= by1 || ay1 >= by2 ||
+              az2 <= bz1 || az1 >= bz2))
+        {
             return true;
+        }
     }
 
     return false;
 }
 
-Space choose_anchor_space(std::vector<Space> spaces)
+Space choose_anchor_space(const std::vector<Space>& spaces)
 {
-    std::sort(spaces.begin(), spaces.end(),
-              [](const Space& a, const Space& b)
-              {
-                  if (a.z != b.z) return a.z < b.z;
-                  if (a.y != b.y) return a.y < b.y;
-                  return a.x < b.x;
-              });
+    auto it = std::min_element(
+            spaces.begin(), spaces.end(),
+            [](const Space& a, const Space& b)
+            {
+                if (a.z != b.z) return a.z < b.z;
+                if (a.y != b.y) return a.y < b.y;
+                return a.x < b.x;
+            });
 
-    return spaces[0];
+    return *it;
 }

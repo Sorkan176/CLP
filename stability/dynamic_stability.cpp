@@ -75,20 +75,12 @@ bool is_dynamically_stable(
         double max_accel,
         double mu)
 {
-    const double g = 9.81;
-
     // sliding
     if (max_accel >= mu * g)
         return false;
 
     for (const auto& pl : placed)
     {
-        double h = pl.z + pl.d / 2.0;
-        double b = pl.l / 2.0;
-
-        if (max_accel * h > g * b)
-            return false;
-
         if (!is_tilt_stable(pl, placed, container_wd, container_lth))
             return false;
     }
@@ -118,11 +110,6 @@ std::vector<std::string> check_constrained_sides(
         int container_lth)
 {
     std::vector<std::string> unconstrained;
-
-    double support_area = 0.49;
-
-    double box_xz_area = box.w * box.d;
-    double box_yz_area = box.l * box.d;
 
     double side_xz1=0, side_yz1=0, side_xz2=0, side_yz2=0;
 
@@ -166,16 +153,16 @@ std::vector<std::string> check_constrained_sides(
         }
     }
 
-    if (!side_xz1 && side_xz1/box_xz_area < support_area)
+    if (!side_xz1)
         unconstrained.push_back("XZ1");
 
-    if (!side_yz1 && side_yz1/box_yz_area < support_area)
+    if (!side_yz1)
         unconstrained.push_back("YZ1");
 
-    if (!side_xz2 && side_xz2/box_xz_area < support_area)
+    if (!side_xz2)
         unconstrained.push_back("XZ2");
 
-    if (!side_yz2 && side_yz2/box_yz_area < support_area)
+    if (!side_yz2)
         unconstrained.push_back("YZ2");
 
     return unconstrained;
@@ -187,7 +174,8 @@ bool is_tilt_stable(
         const std::vector<Placement>& placed,
         int container_wd,
         int container_lth,
-        double tipping_angle_deg)
+        double max_accel,
+        double tipping_angle_rad)
 {
     auto unconstrained =
             check_constrained_sides(pl, placed, container_wd, container_lth);
@@ -204,9 +192,7 @@ bool is_tilt_stable(
     double cy = pl.y + pl.l/2.0;
 
     double h = pl.d/2.0;
-
-    double tipping_angle =
-            tipping_angle_deg * M_PI / 180.0;
+    constexpr double EPS = 1e-9;
 
     for (const auto& side : unconstrained)
     {
@@ -220,10 +206,13 @@ bool is_tilt_stable(
         if (w <= 0)
             return false;
 
-        double critical_angle = std::atan(w/h);
-
-        if (critical_angle < tipping_angle)
+        if (max_accel * h > g * w + EPS) {
             return false;
+        }
+
+        if (w <= tipping_angle_rad * h + EPS) {
+            return false;
+        }
     }
 
     return true;

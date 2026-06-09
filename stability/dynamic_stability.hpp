@@ -6,6 +6,7 @@
 
 constexpr double MAX_ACCELERATION = 1.5;
 constexpr double MU = 0.35;
+constexpr double g = 9.81;
 
 bool is_dynamically_stable(
         const std::vector<Placement>& placed,
@@ -32,5 +33,6 @@ bool is_tilt_stable(
         const std::vector<Placement>& placed,
         int container_wd,
         int container_lth,
-        double tipping_angle_deg = 11.0
+        double max_accel = MAX_ACCELERATION,
+        double tipping_angle_rad = 0.194
 );
