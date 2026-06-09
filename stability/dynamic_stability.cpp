@@ -111,11 +111,6 @@ std::vector<std::string> check_constrained_sides(
 {
     std::vector<std::string> unconstrained;
 
-    double support_area = 0.49;
-
-    double box_xz_area = box.w * box.d;
-    double box_yz_area = box.l * box.d;
-
     double side_xz1=0, side_yz1=0, side_xz2=0, side_yz2=0;
 
     if (box.y == 0) side_xz1 = 1.0;
@@ -158,16 +153,16 @@ std::vector<std::string> check_constrained_sides(
         }
     }
 
-    if (!side_xz1 && side_xz1/box_xz_area < support_area)
+    if (!side_xz1)
         unconstrained.push_back("XZ1");
 
-    if (!side_yz1 && side_yz1/box_yz_area < support_area)
+    if (!side_yz1)
         unconstrained.push_back("YZ1");
 
-    if (!side_xz2 && side_xz2/box_xz_area < support_area)
+    if (!side_xz2)
         unconstrained.push_back("XZ2");
 
-    if (!side_yz2 && side_yz2/box_yz_area < support_area)
+    if (!side_yz2)
         unconstrained.push_back("YZ2");
 
     return unconstrained;

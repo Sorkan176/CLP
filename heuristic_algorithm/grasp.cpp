@@ -83,7 +83,6 @@ std::vector<Placement> build_rcl(
     double f_max = -1e18;
     double f_min =  1e18;
 
-    // первый проход: границы
     for (const auto& c : candidates)
     {
         double sc = placement_score(c.placement, c.support);
@@ -96,7 +95,6 @@ std::vector<Placement> build_rcl(
     std::vector<Placement> rcl;
     rcl.reserve(candidates.size());
 
-    // второй проход: отбор
     for (const auto& c : candidates)
     {
         double sc = placement_score(c.placement, c.support);
@@ -284,10 +282,10 @@ std::vector<Placement> improvement_phase(
 
     int k = std::max(1, (int)(placements.size() * remove_ratio));
 
-    std::vector<Placement> to_remove;
+    std::vector<Placement> to_remove; //коробки которые нужно удалить
 
     for (int i = 0; i < k && i < scored.size(); i++)
-        to_remove.push_back(scored[i].second);
+        to_remove.push_back(scored[i].second); // здесь мы добавлем 15% худших
 
     for (const auto& u : unstable)
     {
@@ -296,10 +294,10 @@ std::vector<Placement> improvement_phase(
                 [&](const Placement& p){ return p.item_index == u.item_index; });
 
         if (it == to_remove.end())
-            to_remove.push_back(u);
+            to_remove.push_back(u); // + еще динамически не стабильные
     }
 
-    std::vector<Placement> remaining;
+    std::vector<Placement> remaining; // а это те что должны остаться
 
     for (const auto& pl : placements)
     {
@@ -320,8 +318,19 @@ std::vector<Placement> improvement_phase(
 
     std::vector<Item> removed_items;
 
-    for (const auto& pl : to_remove)
-        removed_items.push_back(items[pl.item_index]);
+//    for (const auto& pl : to_remove)
+//        removed_items.push_back(items[pl.item_index]);
+
+    std::vector<bool> is_remaining(items.size(), false);
+
+    for (const auto& pl : remaining)
+        is_remaining[pl.item_index - 1] = true;
+
+    for (size_t i = 0; i < items.size(); ++i)
+    {
+        if (!is_remaining[i])
+            removed_items.push_back(items[i]);
+    }
 
     std::vector<Placement> placed = remaining;
 
@@ -459,7 +468,7 @@ SolverState grasp(const std::vector<std::vector<int>>& data)
 
     auto start = std::chrono::high_resolution_clock::now();
 
-    auto state = hybrid_container_loading(items, container, 1500);
+    auto state = hybrid_container_loading(items, container, 2500);
 
     auto end = std::chrono::high_resolution_clock::now();
     std::chrono::duration<double> elapsed = end - start;

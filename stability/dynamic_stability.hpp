@@ -34,5 +34,5 @@ bool is_tilt_stable(
         int container_wd,
         int container_lth,
         double max_accel = MAX_ACCELERATION,
-        double tipping_angle_rad = 0.158
+        double tipping_angle_rad = 0.194
 );
